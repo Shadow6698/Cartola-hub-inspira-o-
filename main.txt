@@ -1,0 +1,171 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- Criar GUI da Lista de Players (Arrastável)
+local PlayerListGui = Instance.new("ScreenGui")
+PlayerListGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local PlayerListFrame = Instance.new("Frame")
+PlayerListFrame.Size = UDim2.new(0, 250, 0, 350)
+PlayerListFrame.Position = UDim2.new(0.05, 0, 0.05, 0)
+PlayerListFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+PlayerListFrame.Active = true
+PlayerListFrame.Draggable = true
+PlayerListFrame.Parent = PlayerListGui
+
+local UpdateButton = Instance.new("TextButton")
+UpdateButton.Size = UDim2.new(1, 0, 0, 30)
+UpdateButton.Text = "🔄 Atualizar Lista"
+UpdateButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+UpdateButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+UpdateButton.Parent = PlayerListFrame
+
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Size = UDim2.new(1, 0, 1, -40)
+ScrollingFrame.Position = UDim2.new(0, 0, 0, 40)
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollingFrame.ScrollBarThickness = 5
+ScrollingFrame.Parent = PlayerListFrame
+
+-- Criar GUI de Opções (Fixo à Direita, Oculto)
+local OptionsGui = Instance.new("ScreenGui")
+OptionsGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local OptionsFrame = Instance.new("Frame")
+OptionsFrame.Size = UDim2.new(0, 180, 0, 180)
+OptionsFrame.Position = UDim2.new(0.3, 0, 0.05, 0)
+OptionsFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+OptionsFrame.Visible = false
+OptionsFrame.Parent = OptionsGui
+
+local OptionsLabel = Instance.new("TextLabel")
+OptionsLabel.Size = UDim2.new(1, 0, 0, 30)
+OptionsLabel.Text = "Selecione um jogador"
+OptionsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+OptionsLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+OptionsLabel.Parent = OptionsFrame
+
+-- Criar Botão "X" Móvel para Fechar o GUI de Opções
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 50, 0, 50)
+CloseButton.Position = UDim2.new(0.8, 0, 0.1, 0) -- Posição inicial
+CloseButton.Text = "❌"
+CloseButton.TextScaled = true
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.Active = true
+CloseButton.Draggable = true
+CloseButton.Visible = false
+CloseButton.Parent = OptionsGui
+
+CloseButton.MouseButton1Click:Connect(function()
+    OptionsFrame.Visible = false
+    CloseButton.Visible = false
+end)
+
+-- Criar Botões de Opções
+local function CreateOptionButton(text, position, parent)
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(1, 0, 0, 30)
+    Button.Position = UDim2.new(0, 0, 0, position)
+    Button.Text = text
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    Button.Parent = parent
+    return Button
+end
+
+local TeleportButton = CreateOptionButton("🚀 Teleport", 30, OptionsFrame)
+local GrudarButton = CreateOptionButton("🧲 Grudar", 60, OptionsFrame)
+local ViewButton = CreateOptionButton("👀 View", 90, OptionsFrame)
+local XrayButton = CreateOptionButton("🔍 Xray", 120, OptionsFrame)
+
+local CurrentTarget = nil
+local Grudado = false
+local Viewing = false
+local XrayAtivo = false
+local XrayOriginal = {}
+
+-- Funções dos botões
+TeleportButton.MouseButton1Click:Connect(function()
+    if CurrentTarget and CurrentTarget.Character and LocalPlayer.Character then
+        LocalPlayer.Character:MoveTo(CurrentTarget.Character:GetPrimaryPartCFrame().p)
+    end
+end)
+
+GrudarButton.MouseButton1Click:Connect(function()
+    Grudado = not Grudado
+    GrudarButton.Text = Grudado and "❌ Desgrudar" or "🧲 Grudar"
+    RunService.RenderStepped:Connect(function()
+        if Grudado and CurrentTarget and CurrentTarget.Character and LocalPlayer.Character then
+            LocalPlayer.Character:MoveTo(CurrentTarget.Character:GetPrimaryPartCFrame().p)
+        end
+    end)
+end)
+
+ViewButton.MouseButton1Click:Connect(function()
+    Viewing = not Viewing
+    ViewButton.Text = Viewing and "❌ Unview" or "👀 View"
+    Camera.CameraSubject = Viewing and CurrentTarget.Character.Humanoid or LocalPlayer.Character.Humanoid
+end)
+
+XrayButton.MouseButton1Click:Connect(function()
+    XrayAtivo = not XrayAtivo
+    XrayButton.Text = XrayAtivo and "❌ Unxray" or "🔍 Xray"
+
+    if XrayAtivo then
+        -- Ativar Xray
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.Transparency < 0.8 then
+                XrayOriginal[obj] = obj.Transparency
+                obj.Transparency = 0.8
+            end
+        end
+    else
+        -- Desativar Xray (Restaurar Transparência Original)
+        for obj, transparency in pairs(XrayOriginal) do
+            if obj then
+                obj.Transparency = transparency
+            end
+        end
+        XrayOriginal = {} -- Limpar a tabela
+    end
+end)
+
+-- Atualizar a lista de jogadores
+local function UpdatePlayerList()
+    for _, v in pairs(ScrollingFrame:GetChildren()) do
+        if v:IsA("TextButton") then v:Destroy() end
+    end
+
+    local yPos = 0
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local PlayerButton = Instance.new("TextButton")
+            PlayerButton.Size = UDim2.new(1, 0, 0, 30)
+            PlayerButton.Position = UDim2.new(0, 0, 0, yPos)
+            PlayerButton.Text = player.Name
+            PlayerButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+            PlayerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            PlayerButton.Parent = ScrollingFrame
+
+            PlayerButton.MouseButton1Click:Connect(function()
+                CurrentTarget = player
+                OptionsLabel.Text = "Opções: " .. player.Name
+                OptionsFrame.Visible = true
+                CloseButton.Visible = true
+            end)
+
+            yPos = yPos + 35
+        end
+    end
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, yPos)
+end
+
+-- Atualizar a lista ao clicar
+UpdateButton.MouseButton1Click:Connect(UpdatePlayerList)
+
+-- Atualizar ao iniciar
+UpdatePlayerList()
